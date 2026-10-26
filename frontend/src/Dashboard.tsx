@@ -1,8 +1,8 @@
 import {useCallback, useEffect, useState} from 'react';
 import {Activity, AlertTriangle, ArrowUpRight, Clock3, RefreshCw, Server, Zap} from 'lucide-react';
 
-type Summary = {requests:number;average_latency_ms:number;server_errors:number;error_rate_percent:number;window_hours:number};
-type Endpoint = {path:string;method:string;requests:number;average_latency_ms:number;server_errors:number};
+type Summary = {requests:number;average_latency_ms:number;server_errors:number;error_rate_percent:number;window_hours:number;p50_latency_ms:number;p95_latency_ms:number;p99_latency_ms:number};
+type Endpoint = {path:string;method:string;requests:number;average_latency_ms:number;server_errors:number;p50_latency_ms:number;p95_latency_ms:number;p99_latency_ms:number};
 type Point = {hour:string;requests:number};
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -40,7 +40,7 @@ export default function Dashboard(){
       <div className="metric"><div className="metric-label">SERVER ERRORS <AlertTriangle size={18}/></div><strong>{summary?.server_errors??'—'}</strong><div className="metric-sub">HTTP 5xx responses</div></div>
       <div className="metric"><div className="metric-label">ERROR RATE <Zap size={18}/></div><strong>{summary?summary.error_rate_percent.toFixed(2):'—'}<small>%</small></strong><div className="metric-sub">5xx / total requests</div></div>
     </section>
-    <section className="panel"><div className="panel-heading"><div><h2>Request volume</h2><p>Hourly requests across the selected window</p></div><span className="pill">LIVE DATA</span></div><Sparkline points={series}/></section>
+    <section className="panel"><div className="panel-heading"><div><h2>Latency percentiles</h2><p>Nearest-rank response time distribution across the selected window</p></div><span className="pill">PERFORMANCE</span></div><div className="cards"><div className="metric"><div className="metric-label">P50 LATENCY</div><strong>{summary?summary.p50_latency_ms.toFixed(2):"—"} <small>ms</small></strong><div className="metric-sub">Median request</div></div><div className="metric"><div className="metric-label">P95 LATENCY</div><strong>{summary?summary.p95_latency_ms.toFixed(2):"—"} <small>ms</small></strong><div className="metric-sub">95% of requests at or below</div></div><div className="metric"><div className="metric-label">P99 LATENCY</div><strong>{summary?summary.p99_latency_ms.toFixed(2):"—"} <small>ms</small></strong><div className="metric-sub">99% of requests at or below</div></div></div></section><section className="panel"><div className="panel-heading"><div><h2>Request volume</h2><p>Hourly requests across the selected window</p></div><span className="pill">LIVE DATA</span></div><Sparkline points={series}/></section>
     <section className="panel"><div className="panel-heading"><div><h2>Endpoint performance</h2><p>Traffic and response time by route</p></div><span className="pill">{endpoints.length} endpoints</span></div><div className="table-scroll"><table><thead><tr><th>ENDPOINT</th><th>METHOD</th><th>REQUESTS</th><th>AVG LATENCY</th><th>5XX ERRORS</th></tr></thead><tbody>{endpoints.map(e=><tr key={e.method+e.path}><td><code>{e.path}</code></td><td><span className="method">{e.method}</span></td><td>{e.requests.toLocaleString()}</td><td>{e.average_latency_ms.toFixed(2)} ms</td><td>{e.server_errors}</td></tr>)}{!endpoints.length&&<tr><td colSpan={5} className="empty-cell">No endpoint metrics yet.</td></tr>}</tbody></table></div></section>
     <footer>Trace · Open-source API observability MVP</footer>
     </main></div>
