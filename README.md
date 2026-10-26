@@ -1,16 +1,51 @@
-# Trace — API Observability MVP
+# Trace — API Observability Platform
 
-A lightweight API monitoring service built with **FastAPI**, **SQLAlchemy**, and **PostgreSQL**. Automatically records endpoint requests, HTTP status codes, and response latency, then exposes aggregate metrics endpoints.
+A full-stack **API monitoring MVP** with a React/TypeScript dashboard, FastAPI request instrumentation, and PostgreSQL metrics storage. Built to explore API performance, monitoring, and backend engineering.
 
-## Run with Docker
+## Tech stack
+
+- **Frontend:** React, TypeScript, Vite, CSS, SVG charts
+- **Backend:** Python, FastAPI, SQLAlchemy
+- **Database:** PostgreSQL with Docker Compose; SQLite fallback for local Python development
+- **Quality:** Pytest, GitHub Actions (backend tests and frontend build)
+
+## Quick start
+
+Requires Docker and Docker Compose.
 
 ```bash
+git clone https://github.com/ammarsid-del/trace-api-observability.git
+cd trace-api-observability
 docker compose up --build
 ```
 
-Open http://localhost:8000/docs and try `GET /demo/42`, `GET /metrics/summary`, and `GET /metrics/endpoints`.
+- Dashboard: http://localhost:5173
+- FastAPI docs: http://localhost:8000/docs
+- Health endpoint: http://localhost:8000/health
 
-## Run locally
+Generate example traffic:
+
+```bash
+for i in $(seq 1 25); do curl -s http://localhost:8000/demo/$i > /dev/null; done
+```
+
+Refresh the dashboard to see collected requests.
+
+## API
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /health` | Health check |
+| `GET /demo/{item_id}` | Sample instrumented route |
+| `GET /metrics/summary?hours=24` | Request count, average latency, 5xx errors, error rate |
+| `GET /metrics/endpoints?hours=24` | Per-route request counts, latency, errors |
+| `GET /metrics/timeseries?hours=24` | Hourly request counts |
+
+Supported time windows: 1–720 hours. Dashboard offers 1 hour, 24 hours, and 7 days.
+
+## Develop locally
+
+Backend:
 
 ```bash
 python -m venv .venv
@@ -19,22 +54,32 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Local mode defaults to SQLite; Docker Compose uses PostgreSQL.
+Frontend in another terminal:
 
-## Tests
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Run checks
 
 ```bash
 pytest -q
+cd frontend && npm install && npm run build
 ```
 
-## Architecture
+GitHub Actions runs both checks on pushes and pull requests.
 
-FastAPI middleware measures request durations, stores each request in the database, and makes aggregated counts and average latency available through REST endpoints. `/metrics` calls are excluded from collection to avoid self-inflating metrics. This is an MVP, not a production monitoring system: authentication, batching, retention, tracing, percentiles, dashboards, and load testing are future enhancements.
+## Architecture and limitations
 
-## Next steps
+FastAPI middleware measures response time and records the request path, method, status, and duration. PostgreSQL stores the events; aggregate endpoints power the React dashboard. Metrics routes are excluded to avoid self-inflating request statistics.
 
-- React/TypeScript dashboard with charts
-- Endpoint latency percentiles and time-window filters
-- Asynchronous/batched metric writes
-- Load testing and reproducible performance measurements
-- Auth and metrics retention
+**This is an MVP, not a production-grade observability service.** Each monitored request currently performs a synchronous database write; high-volume traffic would require buffered asynchronous ingestion. The service also lacks authentication, data retention policies, distributed tracing, and production deployment. The hourly series returns only buckets with data, and the UI currently uses an SVG chart without a charting library.
+
+## Next milestones
+
+- Add p50/p95/p99 latency and time-window trend charts
+- Add integration tests against PostgreSQL
+- Add buffered ingestion and load-test benchmarks
+- Deploy backend and frontend; capture screenshots and a demo
