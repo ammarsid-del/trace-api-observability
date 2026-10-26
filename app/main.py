@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, 
 from sqlalchemy.orm import DeclarativeBase, Session
 from fastapi import FastAPI, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
+from app.stats import latency_percentiles
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./trace.db")
 engine = create_engine(
@@ -77,7 +78,9 @@ def metrics_summary(hours: int = Query(default=24, ge=1, le=720)):
                 func.sum(case((RequestMetric.status_code >= 500, 1), else_=0)),
             ).where(RequestMetric.recorded_at >= cutoff)
         ).one()
+        latencies = session.scalars(select(RequestMetric.duration_ms).where(RequestMetric.recorded_at >= cutoff)).all()
         return {
+            **latency_percentiles(latencies),
             "requests": total,
             "average_latency_ms": round(avg_ms or 0, 2),
             "server_errors": errors or 0,
@@ -90,22 +93,28 @@ def metrics_endpoints(hours: int = Query(default=24, ge=1, le=720)):
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     with Session(engine) as session:
         rows = session.execute(
-            select(
-                RequestMetric.path, RequestMetric.method,
-                func.count(RequestMetric.id),
-                func.avg(RequestMetric.duration_ms),
-                func.sum(case((RequestMetric.status_code >= 500, 1), else_=0)),
-            ).where(RequestMetric.recorded_at >= cutoff)
+            select(RequestMetric.path, RequestMetric.method,
+                   func.count(RequestMetric.id), func.avg(RequestMetric.duration_ms),
+                   func.sum(case((RequestMetric.status_code >= 500, 1), else_=0)))
+            .where(RequestMetric.recorded_at >= cutoff)
             .group_by(RequestMetric.path, RequestMetric.method)
             .order_by(func.count(RequestMetric.id).desc())
         ).all()
-        return [
-            {
+        result = []
+        for path, method, count, avg, errors in rows:
+            latencies = session.scalars(
+                select(RequestMetric.duration_ms).where(
+                    RequestMetric.recorded_at >= cutoff,
+                    RequestMetric.path == path,
+                    RequestMetric.method == method,
+                )
+            ).all()
+            result.append({
+                **latency_percentiles(latencies),
                 "path": path, "method": method, "requests": count,
                 "average_latency_ms": round(avg or 0, 2), "server_errors": errors or 0,
-            }
-            for path, method, count, avg, errors in rows
-        ]
+            })
+        return result
 
 @app.get("/metrics/timeseries")
 def metrics_timeseries(hours: int = Query(default=24, ge=1, le=720)):
