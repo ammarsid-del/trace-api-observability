@@ -5,9 +5,18 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql+psycopg://trace:trace@db:5432/trace
+      CORS_ORIGINS: http://localhost:5173
     depends_on:
       db:
         condition: service_healthy
+  dashboard:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    depends_on:
+      - api
   db:
     image: postgres:16-alpine
     environment:
